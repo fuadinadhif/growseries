@@ -1,6 +1,5 @@
 {
-  "buildCommand": "npx turbo run build --filter=api",
-  "outputDirectory": "apps/api/dist",
-  "installCommand": "npm install",
+  "buildCommand": "cd ../.. && npx turbo run build --filter=api",
+  "outputDirectory": "dist",
   "framework": null
 }
