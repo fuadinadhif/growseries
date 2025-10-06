@@ -1,9 +1,5 @@
 {
-  "builds": [
-    {
-      "src": "dist/api/index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [{ "src": "/(.*)", "dest": "dist/api/index.js" }]
+  "buildCommand": "npx turbo run build --filter=api",
+  "outputDirectory": "apps/api/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }
