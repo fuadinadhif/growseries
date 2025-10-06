@@ -1,5 +1,10 @@
 {
   "buildCommand": "npx turbo run build --filter=api",
   "outputDirectory": "apps/api/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+  "functions": {
+    "api/index.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "routes": [{ "src": "/(.*)", "dest": "apps/api/dist/index.js" }]
 }
