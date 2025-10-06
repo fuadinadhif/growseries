@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx turbo run build --filter=api && ls -la apps/api/dist",
+  "buildCommand": "pwd && ls -la && ls -la apps && npx turbo run build --filter=api && find . -type f -name 'index.js' | grep -E '(dist|build)' | head -20",
   "outputDirectory": "apps/api/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }
