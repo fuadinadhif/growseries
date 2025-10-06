@@ -1,6 +1,7 @@
 {
   "name": "api",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "dev": "cross-env NODE_ENV=development tsx --watch src/index.ts",
