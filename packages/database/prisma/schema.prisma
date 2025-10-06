@@ -1,0 +1,381 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================= Enums =================
+enum UserRole {
+  USER
+  SUPER_ADMIN
+  STORE_ADMIN
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT // Menunggu Pembayaran
+  PAYMENT_REVIEW // Menunggu Konfirmasi Pembayaran
+  PROCESSING // Diproses
+  SHIPPED // Dikirim
+  CONFIRMED // Pesanan Dikonfirmasi
+  CANCELLED // Dibatalkan
+}
+
+enum PaymentMethod {
+  MANUAL_TRANSFER
+  GATEWAY
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REJECTED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  NOMINAL
+  BUYXGETX
+}
+
+enum ValueType {
+  PRODUCT_DISCOUNT
+  BUY1GET1
+}
+
+enum StockChangeReason {
+  ADD
+  REMOVE
+  RESERVE 
+  RELEASE
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum TokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+enum Provider {
+  GITHUB
+  GOOGLE
+}
+
+// ================= Models =================
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  password     String
+  isVerified   Boolean  @default(false)
+  role         UserRole @default(USER)
+  referralCode String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile          UserProfile?
+  addresses        UserAddress[]
+  carts            Cart[]
+  orders           Order[]
+  vouchers         Voucher[]
+  socialAccounts   SocialAccount[]
+  Token            Token[]
+  storeAssignments StoreAdminAssignment[]
+  StockJournal     StockJournal[]
+}
+
+model UserProfile {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int      @unique
+  fullName  String?
+  avatarUrl String?
+  updatedAt DateTime @updatedAt
+}
+
+model SocialAccount {
+  id             Int      @id @default(autoincrement())
+  user           User     @relation(fields: [userId], references: [id])
+  userId         Int
+  provider       Provider
+  providerUserId String
+  linkedAt       DateTime @default(now())
+
+  @@unique([provider, providerUserId])
+}
+
+model Token {
+  id        Int       @id @default(autoincrement())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    Int
+  tokenHash String    @unique
+  type      TokenType
+  expiredAt DateTime
+  usedAt    DateTime?
+}
+
+model UserAddress {
+  id            Int      @id @default(autoincrement())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        Int
+  label         String?
+  recipientName String
+  addressLine   String
+  province      String
+  city          String
+  district      String?
+  postalCode    String
+  latitude      Decimal
+  longitude     Decimal
+  isPrimary     Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Store {
+  id        Int      @id @default(autoincrement())
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  locations     StoreLocation[]
+  inventories   StoreInventory[]
+  discounts     Discount[]
+  orders        Order[]
+  assignments   StoreAdminAssignment[]
+  stockJournals StockJournal[]
+  cart          Cart[]
+}
+
+model StoreLocation {
+  id          Int      @id @default(autoincrement())
+  store       Store    @relation(fields: [storeId], references: [id])
+  storeId     Int
+  addressLine String
+  province    String
+  city        String
+  district    String?
+  postalCode  String
+  latitude    Decimal  @db.Decimal(9, 6)
+  longitude   Decimal  @db.Decimal(9, 6)
+  updatedAt   DateTime @updatedAt
+}
+
+model StoreAdminAssignment {
+  id         Int      @id @default(autoincrement())
+  store      Store    @relation(fields: [storeId], references: [id])
+  storeId    Int
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+  assignedAt DateTime @default(now())
+}
+
+model Product {
+  id          Int             @id @default(autoincrement())
+  category    ProductCategory @relation(fields: [categoryId], references: [id])
+  categoryId  Int
+  name        String          @unique
+  slug        String          @unique
+  description String?
+  price       Decimal
+  weight      Int
+  width       Int?
+  height      Int?
+  length      Int?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  images        ProductImage[]
+  inventories   StoreInventory[]
+  orderItems    OrderItem[]
+  discounts     Discount[]
+  cartItems     CartItem[]
+  stockJournals StockJournal[]
+}
+
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+  imageUrl  String
+}
+
+model ProductCategory {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String?
+
+  products Product[]
+}
+
+model StoreInventory {
+  id        Int      @id @default(autoincrement())
+  store     Store    @relation(fields: [storeId], references: [id])
+  storeId   Int
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+  stockQty  Int
+  updatedAt DateTime @updatedAt
+
+  stockJournals StockJournal[]
+
+  @@unique([storeId, productId])
+}
+
+model StockJournal {
+  id        Int               @id @default(autoincrement())
+  store     Store             @relation(fields: [storeId], references: [id])
+  storeId   Int
+  product   Product           @relation(fields: [productId], references: [id])
+  productId Int
+  inventory StoreInventory    @relation(fields: [storeId, productId], references: [storeId, productId])
+  qtyChange Int
+  reason    StockChangeReason
+  note      String?
+  admin     User              @relation(fields: [adminId], references: [id])
+  adminId   Int
+  createdAt DateTime          @default(now())
+}
+
+model Discount {
+  id          Int          @id @default(autoincrement())
+  name        String
+  store       Store        @relation(fields: [storeId], references: [id])
+  storeId     Int
+  product     Product      @relation(fields: [productId], references: [id])
+  productId   Int
+  value       ValueType
+  amount      Int?
+  type        DiscountType
+  buyQty      Int?
+  getQty      Int?
+  minPurchase Int?
+  maxDiscount Int?
+  expiredAt   DateTime
+
+  vouchers Voucher[]
+}
+
+model Voucher {
+  id         Int       @id @default(autoincrement())
+  user       User      @relation(fields: [userId], references: [id])
+  userId     Int
+  discount   Discount  @relation(fields: [discountId], references: [id])
+  discountId Int
+  isUsed     Boolean   @default(false)
+  usedAt     DateTime?
+}
+// Voucher model is present for rollback support but not fully implemented yet.
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  store     Store    @relation(fields: [storeId], references: [id])
+  storeId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CartItem[]
+
+  @@unique([userId, storeId])
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  cartId    Int
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+  qty       Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id                Int           @id @default(autoincrement())
+  user              User          @relation(fields: [userId], references: [id])
+  userId            Int
+  store             Store         @relation(fields: [storeId], references: [id])
+  storeId           Int
+  address           UserAddress   @relation(fields: [addressId], references: [id])
+  addressId         Int
+  status            OrderStatus
+  paymentMethod     PaymentMethod
+  subtotalAmount    Int
+  shippingCost      Int
+  discountTotal     Int
+  grandTotal        Int
+  totalItems        Int
+  paymentDeadlineAt DateTime
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  items    OrderItem[]
+  payment  Payment?
+  shipment Shipment?
+}
+
+model OrderItem {
+  id                Int     @id @default(autoincrement())
+  order             Order   @relation(fields: [orderId], references: [id])
+  orderId           Int
+  product           Product @relation(fields: [productId], references: [id])
+  productId         Int
+  productSnapshot   String
+  unitPriceSnapshot Decimal
+  qty               Int
+  totalAmount       Int
+}
+
+model Payment {
+  id                   Int           @id @default(autoincrement())
+  order                Order         @relation(fields: [orderId], references: [id])
+  orderId              Int           @unique
+  reviewedByAdminId    Int?
+  status               PaymentStatus
+  amount               Int
+  gatewayTransactionId String?
+  proofImageUrl        String?
+  reviewedAt           DateTime?
+  paidAt               DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+model ShippingMethod {
+  id          Int     @id @default(autoincrement())
+  carrier     String
+  serviceCode String
+  isActive    Boolean @default(true)
+
+  shipments Shipment[]
+}
+
+model Shipment {
+  id             Int            @id @default(autoincrement())
+  order          Order          @relation(fields: [orderId], references: [id])
+  orderId        Int            @unique
+  method         ShippingMethod @relation(fields: [methodId], references: [id])
+  methodId       Int
+  trackingNumber String?
+  cost           Int
+  status         String
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+}

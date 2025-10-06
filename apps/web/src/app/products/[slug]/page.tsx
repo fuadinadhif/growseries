@@ -1,0 +1,187 @@
+"use client";
+
+import { useParams } from "next/navigation";
+import Image from "next/image";
+import { useState, useEffect } from "react";
+import { useProduct } from "@/hooks/useProduct";
+import { useAddToCart } from "@/hooks/useCart";
+import { toast } from "sonner";
+import useLocationStore from "@/stores/locationStore";
+
+export default function ProductDetailPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const { data: product, isLoading, error } = useProduct(slug);
+  const [userId, setUserId] = useState<number>(1);
+  const [quantity, setQuantity] = useState(1);
+
+  const nearestStoreId = useLocationStore((s) => s.nearestStoreId) ?? 1;
+  const addToCartMutation = useAddToCart(userId, nearestStoreId);
+
+  const nearestStoreName = useLocationStore((s) => s.nearestStoreName);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const images: string[] = product?.images?.length
+    ? product.images
+    : [product?.imageUrl || "/placeholder.png"];
+
+  // Get development user ID from localStorage
+  useEffect(() => {
+    const devUserId = localStorage.getItem("devUserId");
+    if (devUserId && devUserId !== "none") {
+      setUserId(parseInt(devUserId));
+    } else {
+      setUserId(1); // Default user for demo
+    }
+  }, []);
+
+  const handleAddToCart = () => {
+    if (!product || !userId) return;
+
+    addToCartMutation.mutate(
+      {
+        productId: parseInt(product.id),
+        qty: quantity,
+        storeId: nearestStoreId,
+        userId: userId,
+      },
+      {
+        onSuccess: () => {
+          toast.success(`${quantity} ${product.name} added to cart!`);
+          setQuantity(1); // Reset quantity after adding
+        },
+      }
+    );
+  };
+
+  if (isLoading) return <p className="p-6 text-center">Loading...</p>;
+  if (error instanceof Error)
+    return <p className="p-6 text-center text-red-500">{error.message}</p>;
+  if (!product)
+    return <p className="p-6 text-center text-red-500">Product not found</p>;
+
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        {/* Gambar Produk */}
+        <div className="relative w-full h-80 md:h-[500px]">
+          <Image
+            src={images[currentIndex]}
+            alt={`${product.name} ${currentIndex + 1}`}
+            fill
+            className="object-cover rounded-2xl shadow-md"
+          />
+
+          {/* Tombol prev/next */}
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={() =>
+                  setCurrentIndex((prev) =>
+                    prev === 0 ? images.length - 1 : prev - 1
+                  )
+                }
+                className="absolute left-3 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full"
+              >
+                ‹
+              </button>
+              <button
+                onClick={() =>
+                  setCurrentIndex((prev) =>
+                    prev === images.length - 1 ? 0 : prev + 1
+                  )
+                }
+                className="absolute right-3 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full"
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+            {images.map((img, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentIndex(idx)}
+                className={`w-3 h-3 rounded-full ${
+                  idx === currentIndex ? "bg-white" : "bg-gray-400"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Detail Produk */}
+        <div className="flex flex-col justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
+            <p className="text-gray-600 mb-6">{product.description}</p>
+            <p className="text-element font-bold text-2xl mb-6">
+              Rp {product.price.toLocaleString("id-ID")}
+            </p>
+
+            {/* Info Tambahan */}
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">Kategori</span>
+                <span className="font-medium">{product.category}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">Berat</span>
+                <span className="font-medium">{product.weight} gram</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">Volume</span>
+                <span className="font-medium">
+                  {(product.weight ?? 0) *
+                    (product.length ?? 0) *
+                    (product.height ?? 0)}
+                </span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">Toko</span>
+                <span className="font-medium">
+                  {nearestStoreName ?? product.store}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quantity Selector */}
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Quantity
+            </label>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition"
+              >
+                -
+              </button>
+              <span className="text-xl font-semibold min-w-[3rem] text-center">
+                {quantity}
+              </span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Tombol Aksi */}
+          <div className="mt-8 flex gap-4">
+            <button
+              onClick={handleAddToCart}
+              disabled={addToCartMutation.isPending}
+              className="flex-1 border bg-primary-gradient text-white py-3 rounded-lg hover:bg-amber-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {addToCartMutation.isPending ? "Adding..." : "Add to cart"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
