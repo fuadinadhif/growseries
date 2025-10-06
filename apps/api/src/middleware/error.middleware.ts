@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import z, { ZodError } from "zod";
-import { Prisma } from "@repo/database/generated/prisma";
+import { Prisma } from "@repo/database/generated/prisma/index.js";
 import { AppError } from "../errors/app.error.js";
 import { MulterError } from "multer";
 import logger from "../utils/logger.js";
